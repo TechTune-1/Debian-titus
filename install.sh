@@ -35,9 +35,92 @@ fi
 
 builddir=$(pwd)
 
-# Update packages list and update system
-apt update
-apt upgrade -y
+# Function to run commands as non-root user
+non_root() {
+    local command="$1"
+    runuser -u "${SUDO_USER}" -- bash -c "$command"
+}
+
+# ANSI escape sequences for text formatting
+bold=$(tput bold)
+normal=$(tput sgr0)
+
+# Define the new sources content
+sources_content="# Trixie (main)
+deb http://deb.debian.org/debian/ trixie main contrib non-free non-free-firmware
+deb-src http://deb.debian.org/debian/ trixie main contrib non-free non-free-firmware
+
+# Trixie Security Updates
+deb http://security.debian.org/debian-security trixie-security main contrib non-free non-free-firmware
+deb-src http://security.debian.org/debian-security trixie-security main contrib non-free non-free-firmware
+
+# trixie-updates, to get updates before a point release is made;
+# see https://www.debian.org/doc/manuals/debian-reference/ch02.en.html#_updates_and_backports
+deb http://deb.debian.org/debian/ trixie-updates main non-free-firmware
+deb-src http://deb.debian.org/debian/ trixie-updates main non-free-firmware
+
+# Sid (unstable)
+deb http://deb.debian.org/debian/ sid main contrib non-free non-free-firmware
+deb-src http://deb.debian.org/debian/ sid main contrib non-free non-free-firmware
+
+# Bookworm (stable)
+deb http://deb.debian.org/debian/ bookworm main contrib non-free non-free-firmware
+deb-src http://deb.debian.org/debian/ bookworm main contrib non-free non-free-firmware
+
+# Bookworm Security Updates
+deb http://security.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware
+deb-src http://security.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware
+
+# Bookworm Updates
+deb http://deb.debian.org/debian/ bookworm-updates main contrib non-free non-free-firmware
+deb-src http://deb.debian.org/debian/ bookworm-updates main contrib non-free non-free-firmware
+"
+
+# Backup existing sources.list file
+sources_backup="/etc/apt/sources.list.bak"
+sudo cp /etc/apt/sources.list "$sources_backup"
+
+# Extract #deb cdrom lines from the original sources.list
+cdrom_lines=$(grep '^#deb cdrom:' /etc/apt/sources.list || true)
+
+# Write the #deb cdrom lines and new sources content to sources.list
+{
+    if [[ -n "$cdrom_lines" ]]; then
+        echo "$cdrom_lines"
+        echo ""
+    fi
+    echo "$sources_content"
+} | sudo tee /etc/apt/sources.list > /dev/null
+
+# Define the apt pinning preferences content
+pinning_content="Package: *
+Pin: release a=testing
+Pin-Priority: 700
+
+Package: *
+Pin: release a=unstable
+Pin-Priority: 500
+
+Package: *
+Pin: release a=stable
+Pin-Priority: 400
+"
+
+# Create apt pinning file
+preferences="/etc/apt/preferences.d/80-titus-pin"
+echo "$pinning_content" | sudo tee "$preferences" > /dev/null
+
+# Tell user
+echo "sources.list and apt pinning preferences updated successfully."
+echo "Apt pinning preferences have been saved to $preferences"
+echo "A backup of the original sources.list file is saved as $sources_backup"
+
+# Configure
+dpkg --configure -a
+apt install -f -y
+
+# Update packages list and upgrade system
+apt update && apt upgrade -y
 
 # Install nala
 apt install nala -y
