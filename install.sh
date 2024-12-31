@@ -247,12 +247,31 @@ fi
 # Install brave-browser
 nala install apt-transport-https curl -y
 curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
-echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg arch=amd64] https://brave-browser-apt-release.s3.brave.com/ stable main" | tee /etc/apt/sources.list.d/brave-browser-release.list
+echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg arch=amd64] https://brave-browser-apt-release.s3.brave.com/ stable main" | tee /etc/apt/sources.list.d/brave-browser-release.list > /dev/null
 nala update
 nala install brave-browser -y
 
+# Ask the user if they want to set xorg configuration
+read -p "Do you want to set xorg configuration with auto_xorg.sh? (Y/n) " -n 1 -r
+echo
+
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    # Execute auto_xorg.sh in the current directory
+    ./auto_xorg.sh
+fi
+
 # Enable graphical login and change target from CLI to GUI
+mkdir -p /var/lib/lightdm/data
+if [ ! -f /etc/systemd/system/display-manager.service ]; then
+  ln -s /lib/systemd/system/lightdm.service /etc/systemd/system/display-manager.service
+fi
+
+if ! grep -q '^WantedBy=graphical.target$' /usr/lib/systemd/system/lightdm.service; then
+    sed -i '/\[Install\]/a WantedBy=graphical.target' /usr/lib/systemd/system/lightdm.service
+fi
+
 systemctl enable lightdm
+systemctl daemon-reload
 systemctl set-default graphical.target
 
 # Polybar configuration
