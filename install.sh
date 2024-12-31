@@ -125,22 +125,54 @@ apt update && apt upgrade -y
 # Install nala
 apt install nala -y
 
-# Making .config and Moving config files and background to Pictures
-cd $builddir
-mkdir -p /home/$username/.config
-mkdir -p /home/$username/.fonts
-mkdir -p /home/$username/Pictures
-cp .Xresources /home/$username
-cp .Xnord /home/$username
+# Create necessary directories and copy configuration files
+mkdir -p /home/$username/.config /home/$username/.fonts /home/$username/Pictures
+cp .Xresources .Xnord /home/$username
 cp -R dotconfig/* /home/$username/.config/
 cp bg.jpg /home/$username/Pictures/background.jpg
 mv user-dirs.dirs /home/$username/.config
 chown -R $username:$username /home/$username
 
-# Installing Essential Programs 
-nala install feh bspwm sxhkd kitty arandr rofi polybar picom thunar lxpolkit x11-xserver-utils unzip yad wget pulseaudio pavucontrol -y
-# Installing Other less important Programs
-nala install neofetch flameshot psmisc vim lxappearance papirus-icon-theme fonts-noto-color-emoji lightdm zoxide -y
+# Make sure Git is installed
+echo "${bold}Checking if Git is installed...${normal}"
+if ! command -v git &> /dev/null; then
+    echo "${bold}Git is not installed.${normal} Installing Git..."
+    sudo apt install git -y
+fi
+
+# Detect GPU
+gpu=$(lspci -nn | grep -E "VGA|3D controller" | cut -d ':' -f3)
+
+# Install GPU drivers based on detection
+case "$gpu" in
+  *NVIDIA*)
+    echo "NVIDIA GPU detected. Installing NVIDIA drivers..."
+    nala install -y linux-headers-$(uname -r) nvidia-driver firmware-misc-nonfree
+    ;;
+  *AMD*)
+    echo "AMD GPU detected. Installing AMD drivers..."
+    nala install -y firmware-amd-graphics libgl1-mesa-dri libglx-mesa0 mesa-vulkan-drivers xserver-xorg-video-all
+    ;;
+  *Intel*)
+    echo "Intel GPU detected. Installing Intel drivers..."
+    nala install -y xserver-xorg-video-intel
+    ;;
+  *)
+    echo "Unable to detect GPU or unsupported GPU found."
+    echo "GPU info: $gpu"
+    echo "You may need to install drivers manually."
+    ;;
+esac
+
+# Essential Programs
+essential_programs=(feh bspwm sxhkd kitty arandr rofi polybar picom thunar gvfs lxpolkit x11-xserver-utils unzip yad wget pulseaudio pavucontrol gnome-keyring accountsservice lightdm neovim)
+# Other less important Programs
+other_programs=(lxappearance papirus-icon-theme fastfetch flameshot psmisc kio-extras fonts-noto-color-emoji curl ntfs-3g zoxide libimlib2-dev)
+
+# Install Programs individually
+for program in "${essential_programs[@]}" "${other_programs[@]}"; do
+  nala install -y $program || { echo "Failed to install $program" >&2; exit 1; }
+done
 
 # Download Nordic Theme
 cd /usr/share/themes/
