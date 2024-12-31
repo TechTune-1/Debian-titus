@@ -1,12 +1,38 @@
 #!/bin/bash
+set -euo pipefail
 
 # Check if Script is Run as Root
 if [[ $EUID -ne 0 ]]; then
-  echo "You must be a root user to run this script, please run sudo ./install.sh" 2>&1
+  echo "You must be a root user to run this script, please run sudo ./install.sh" >&2
   exit 1
 fi
 
-username=$(id -u -n 1000)
+# Create a directory for logs
+readonly LOG_DIR="/var/log/titus_log"
+mkdir -p "$LOG_DIR"
+
+# Define log file paths
+readonly LOGFILE="install.log"
+readonly TIMING_FILE="install.timing"
+
+if [ -z "${INSIDE_SCRIPT:-}" ]; then
+  # Re-run the script inside `script`
+  export INSIDE_SCRIPT=1
+  exec script -q -c "bash $0" --flush --timing="$TIMING_FILE" "$LOGFILE"
+fi
+
+# Move the log files to the log directory
+mv "$LOGFILE" "$LOG_DIR/"
+mv "$TIMING_FILE" "$LOG_DIR/"
+
+# Determine username
+username=$(getent passwd ${SUDO_USER:-$USER} | cut -d: -f1)
+
+if [[ -z "$username" ]]; then
+  echo "Unable to determine username." >&2
+  exit 1
+fi
+
 builddir=$(pwd)
 
 # Update packages list and update system
@@ -77,3 +103,13 @@ bash scripts/changeinterface
 
 # Use nala
 bash scripts/usenala
+
+# Wait for the commands to finish completely before zipping
+sleep 3
+
+# Zip the log and timing files without including the directory itself
+tar -czf "$LOG_DIR/install_log.tar.gz" -C "$LOG_DIR" install.log install.timing
+rm -r "$LOG_DIR/install.log" "$LOG_DIR/install.timing"
+
+echo "Log and timing files are zipped into the $LOG_DIR directory. They can be replayed by executing ./replay_log.sh in the debian-titus directory."
+echo "You can safely reboot."
