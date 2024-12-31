@@ -289,3 +289,14 @@ rm -r "$LOG_DIR/install.log" "$LOG_DIR/install.timing"
 
 echo "Log and timing files are zipped into the $LOG_DIR directory. They can be replayed by executing ./replay_log.sh in the debian-titus directory."
 echo "You can safely reboot."
+
+countdown=10
+
+while [ $countdown -gt 0 ]; do
+    echo -ne "Rebooting in $countdown seconds...\r"
+    sleep 1
+    countdown=$((countdown - 1))
+done
+
+echo -e "\nRebooting now..."
+sudo reboot
