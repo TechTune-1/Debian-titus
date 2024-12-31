@@ -181,7 +181,7 @@ unzip Sweet-Dark-v40.zip
 rm Sweet-Dark-v40.zip
 
 # Installing fonts
-cd $builddir 
+cd $builddir
 nala install fonts-font-awesome -y
 wget https://github.com/ryanoasis/nerd-fonts/releases/download/v2.1.0/FiraCode.zip
 unzip FiraCode.zip -d /home/$username/.fonts
@@ -190,10 +190,9 @@ unzip Meslo.zip -d /home/$username/.fonts
 mv dotfonts/fontawesome/otfs/*.otf /home/$username/.fonts/
 chown $username:$username /home/$username/.fonts/*
 
-# Reloading Font
+# Reload Font Cache and remove zip files
 fc-cache -vf
-# Removing zip Files
-rm ./FiraCode.zip ./Meslo.zip
+rm FiraCode.zip Meslo.zip
 
 # Install Nordzy cursor
 git clone https://github.com/alvatip/Nordzy-cursors
@@ -201,6 +200,49 @@ cd Nordzy-cursors
 ./install.sh
 cd $builddir
 rm -rf Nordzy-cursors
+
+# Let user choose whether Beautiful Bash should be installed
+echo "${bold}Do you want to install Beautiful Bash? (y/n)${normal}"
+read answer
+if [ "$answer" != "${answer#[Yy]}" ]; then
+    echo "${bold}Installing Beautiful Bash...${normal}"
+    # Remove the directory if it exists
+    if [ -d "/opt/neovim/squashfs-root" ]; then
+        sudo rm -rf /opt/neovim/squashfs-root
+    fi
+    # Run setup
+    non_root "git clone https://github.com/ChrisTitusTech/mybash"
+    cd mybash
+    non_root "bash setup.sh"
+    cd $builddir
+
+    echo "${bold}Beautiful Bash installation complete.${normal}"
+else
+    echo "${bold}Beautiful Bash installation aborted.${normal}"
+fi
+
+# Check if the locale uses a 12-hour clock
+time_format=$(locale -k LC_TIME | grep 'd_t_fmt' | awk -F'=' '{print $2}')
+
+if [[ $time_format == *"%I"* ]]; then
+    echo "Using 12-hour clock format detected. Do you want to change Polybar to 24-hour format? (N/y)"
+    read answer
+    if [[ $answer == [Yy]* ]]; then
+        sed -i 's/time = "%I:%M %p"/time = "%H:%M"/' /home/$username/.config/polybar/config.ini
+        echo "Polybar configuration updated to use 24-hour format."
+    else
+        echo "No changes made to Polybar configuration."
+    fi
+else
+    echo "Using 24-hour clock format detected. Do you want to change Polybar to 24-hour format? (Y/n)"
+    read answer
+    if [[ $answer == [Yy]* ]]; then
+        sed -i 's/time = "%I:%M %p"/time = "%H:%M"/' /home/$username/.config/polybar/config.ini
+        echo "Polybar configuration updated to use 24-hour format."
+    else
+        echo "No changes made to Polybar configuration."
+    fi
+fi
 
 # Install brave-browser
 nala install apt-transport-https curl -y
